@@ -19,8 +19,9 @@ class StudentBot:
         To get started, you can get the current
         state by calling asp.get_start_state()
         """
+        # randbot
         return "U"
-    
+
     def cleanup(self):
         """
         Input: None
@@ -52,7 +53,7 @@ class RandBot:
         if possibilities:
             return random.choice(possibilities)
         return "U"
-    
+
     def cleanup(self):
         pass
 

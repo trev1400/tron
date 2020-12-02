@@ -46,7 +46,7 @@ They will go UP this round."""
                     % (state.ptm + 1)
                 )
             decision = "U"
-        
+
         signal.setitimer(signal.ITIMER_REAL, 0)
 
         available_actions = asp.get_available_actions(state)
