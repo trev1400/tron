@@ -29,14 +29,13 @@ class StudentBot:
         ptm = start.ptm
         loc = locs[ptm]
 
-        cutoff_ply = 10
-    
-        #print(self.calc_distances(start, board, loc))
+        cutoff_ply = 2
 
-        action = self.abc_max_value(asp, start, ptm, float('-inf'), float('inf'), 0, cutoff_ply, self.eval_func, board, loc)[0]
+        #print(self.calc_distances(start, board, loc))
+        action = self.abc_max_value(asp, start, ptm, float('-inf'), float('inf'), 0, cutoff_ply, board, loc)[0]
         return action
-    
-    def abc_max_value(self, asp, state, ptm, alpha, beta, depth, cutoff_ply, eval_func, board, loc):
+
+    def abc_max_value(self, asp, state, ptm, alpha, beta, depth, cutoff_ply, board, loc):
 
         # Check if a state is a terminal state before checking if it is at cutoff ply
         if asp.is_terminal_state(state):
@@ -45,40 +44,40 @@ class StudentBot:
         actions = list(TronProblem.get_safe_actions(board, loc))
 
         if depth >= cutoff_ply:
-            return None, eval_func(actions)
+            return None, self.eval_func_voronoi(asp, state, board, loc, ptm)
 
         value = float('-inf')
         best_action = None
 
         for action in actions:
             next_state = asp.transition(state, action)
-            min_val = self.abc_min_value(asp, next_state, ptm, alpha, beta, depth + 1, cutoff_ply, eval_func, board, loc)[1]
+            min_val = self.abc_min_value(asp, next_state, ptm, alpha, beta, depth + 1, cutoff_ply, board, loc)[1]
             if min_val > value:
                 value = min_val
                 best_action = action
             if value >= beta: return best_action, value
             alpha = max(alpha, value)
-        
+
         return best_action, value
 
 
-    def abc_min_value(self, asp, state, ptm, alpha, beta, depth, cutoff_ply, eval_func, board, loc):
+    def abc_min_value(self, asp, state, ptm, alpha, beta, depth, cutoff_ply, board, loc):
 
         # Check if a state is a terminal state before checking if it is at cutoff ply
         if asp.is_terminal_state(state):
             return None, asp.evaluate_state(state)[ptm]
 
         actions = list(TronProblem.get_safe_actions(board, loc))
-        
+
         if depth >= cutoff_ply:
-            return None, eval_func(actions)
+            return None, self.eval_func_voronoi(asp, state, board, loc, ptm)
 
         value = float('inf')
         best_action = None
 
         for action in actions:
             next_state = asp.transition(state, action)
-            max_val = self.abc_max_value(asp, next_state, ptm, alpha, beta, depth + 1, cutoff_ply, eval_func, board, loc)[1]
+            max_val = self.abc_max_value(asp, next_state, ptm, alpha, beta, depth + 1, cutoff_ply, board, loc)[1]
             if max_val < value:
                 value = max_val
                 best_action = action
@@ -117,7 +116,7 @@ class StudentBot:
         distances[start_row][start_col] = 0
 
         # Get the immediate neighbors around the current location
-        neighbors = self.get_neighbors(board, loc[0], loc[1])   
+        neighbors = self.get_neighbors(board, loc[0], loc[1])
 
         queue = deque([])
 
@@ -129,7 +128,7 @@ class StudentBot:
             if board[n_row][n_col] not in self.unsafe_vals:
                distances[n_row][n_col] = 1
                queue.appendleft(n)
-        
+
         while len(queue) != 0:
             curr_loc = queue.pop()
             # Get the new distance that we would be able to reach neighboring locations
@@ -153,6 +152,32 @@ class StudentBot:
                         visited[n_row][n_col] = True
 
         return distances
+
+    def eval_func_voronoi(self, asp, state, board, loc, ptm):
+        opp_index = abs(ptm - 1)
+        opp_loc = asp._player_locs_from_board(board)[opp_index]
+        player_distances = self.calc_distances(state, board, loc)
+        # print(player_distances)
+        opp_distances = self.calc_distances(state, board, opp_loc)
+        # print(opp_distances)
+        player_voronoi_size = 0
+        opp_voronoi_size = 0
+        for row in range(len(board)):
+            for col in range(len(board[0])):
+                if player_distances[row][col]!=float('inf') and player_distances[row][col]!=0:
+                    if player_distances[row][col] < opp_distances[row][col]:
+                        player_voronoi_size+=1
+                    if player_distances[row][col] > opp_distances[row][col]:
+                        opp_voronoi_size+=1
+        # print(player_voronoi_size)
+        # print(opp_voronoi_size)
+        # Scaled difference between Voronoi region size
+        total = (len(board)-2) * (len(board[0])-2)
+        voronoi = ((player_voronoi_size/total) - (opp_voronoi_size/total) + 1.0) / 2.0
+        print(voronoi)
+        return voronoi
+
+
 
     def eval_func(self, actions):
         # 4 is maximum number of safe actions that can be taken
