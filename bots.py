@@ -31,7 +31,7 @@ class StudentBot:
 
         cutoff_ply = 10
     
-        print(self.dijkstra(start, board, loc))
+        #print(self.calc_distances(start, board, loc))
 
         action = self.abc_max_value(asp, start, ptm, float('-inf'), float('inf'), 0, cutoff_ply, self.eval_func, board, loc)[0]
         return action
@@ -88,6 +88,7 @@ class StudentBot:
         return best_action, value
 
     def get_neighbors(self, board, curr_row, curr_col):
+        # End row and col are 2 less than board length because of walls
         end_row = len(board)-2
         end_col = len(board[0])-2
         neighbors = []
@@ -103,7 +104,7 @@ class StudentBot:
 
         return neighbors
 
-    def dijkstra(self, state, board, loc):
+    def calc_distances(self, state, board, loc):
         # Distances 2-D list for keeping track of min distance to any given location
         distances = [[float('inf') for col in range(len(board[0]))] for row in range(len(board))]
 
@@ -120,6 +121,7 @@ class StudentBot:
 
         queue = deque([])
 
+        # Add the immediate neighbors of the current location to the queue
         for n in neighbors:
             n_row = n[0]
             n_col = n[1]
@@ -130,9 +132,10 @@ class StudentBot:
         
         while len(queue) != 0:
             curr_loc = queue.pop()
-            # Get the new distance that would be able to reach neighboring locations in
+            # Get the new distance that we would be able to reach neighboring locations
             new_distance = distances[curr_loc[0]][curr_loc[1]] + 1
 
+            # Loop through the neighbors of the current location
             for n in self.get_neighbors(board, curr_loc[0], curr_loc[1]):
                 n_row = n[0]
                 n_col = n[1]
