@@ -19,8 +19,71 @@ class StudentBot:
         To get started, you can get the current
         state by calling asp.get_start_state()
         """
-        # randbot
-        return "U"
+        start = asp.get_start_state()
+        locs = start.player_locs
+        board = start.board
+        ptm = start.ptm
+        loc = locs[ptm]
+
+        cutoff_ply = 10
+
+        action = self.abc_max_value(asp, start, ptm, float('-inf'), float('inf'), 0, cutoff_ply, self.eval_func, board, loc)[0]
+        return action
+    
+    def abc_max_value(self, asp, state, ptm, alpha, beta, depth, cutoff_ply, eval_func, board, loc):
+
+        # Check if a state is a terminal state before checking if it is at cutoff ply
+        if asp.is_terminal_state(state):
+            return None, asp.evaluate_state(state)[ptm]
+
+        actions = list(TronProblem.get_safe_actions(board, loc))
+
+        if depth >= cutoff_ply:
+            return None, eval_func(actions)
+
+        value = float('-inf')
+        bestAction = None
+
+        for action in actions:
+            nextState = asp.transition(state, action)
+            minVal = self.abc_min_value(asp, nextState, ptm, alpha, beta, depth + 1, cutoff_ply, eval_func, board, loc)[1]
+            if minVal > value:
+                value = minVal
+                bestAction = action
+            if value >= beta: return bestAction, value
+            alpha = max(alpha, value)
+        
+        return bestAction, value
+
+
+    def abc_min_value(self, asp, state, ptm, alpha, beta, depth, cutoff_ply, eval_func, board, loc):
+
+        # Check if a state is a terminal state before checking if it is at cutoff ply
+        if asp.is_terminal_state(state):
+            return None, asp.evaluate_state(state)[ptm]
+
+        actions = list(TronProblem.get_safe_actions(board, loc))
+        
+        if depth >= cutoff_ply:
+            return None, eval_func(actions)
+
+        value = float('inf')
+        bestAction = None
+
+        for action in actions:
+            nextState = asp.transition(state, action)
+            maxVal = self.abc_max_value(asp, nextState, ptm, alpha, beta, depth + 1, cutoff_ply, eval_func, board, loc)[1]
+            if maxVal < value:
+                value = maxVal
+                bestAction = action
+            if value <= alpha: return bestAction, value
+            beta = min(beta, value)
+
+        return bestAction, value
+    
+    def eval_func(self, actions):
+        # 4 is maximum number of safe actions that can be taken
+        return len(actions)/(4)
 
     def cleanup(self):
         """
