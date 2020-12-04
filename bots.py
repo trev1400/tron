@@ -4,12 +4,16 @@ import numpy as np
 from tronproblem import *
 from trontypes import CellType, PowerupType
 import random, math
+from collections import deque
 
 # Throughout this file, ASP means adversarial search problem.
 
 
 class StudentBot:
     """ Write your student bot here"""
+
+    def __init__(self):
+        self.unsafe_vals = {CellType.WALL, CellType.BARRIER, '1', '2'}
 
     def decide(self, asp):
         """
@@ -26,6 +30,8 @@ class StudentBot:
         loc = locs[ptm]
 
         cutoff_ply = 10
+    
+        print(self.dijkstra(start, board, loc))
 
         action = self.abc_max_value(asp, start, ptm, float('-inf'), float('inf'), 0, cutoff_ply, self.eval_func, board, loc)[0]
         return action
@@ -42,18 +48,18 @@ class StudentBot:
             return None, eval_func(actions)
 
         value = float('-inf')
-        bestAction = None
+        best_action = None
 
         for action in actions:
-            nextState = asp.transition(state, action)
-            minVal = self.abc_min_value(asp, nextState, ptm, alpha, beta, depth + 1, cutoff_ply, eval_func, board, loc)[1]
-            if minVal > value:
-                value = minVal
-                bestAction = action
-            if value >= beta: return bestAction, value
+            next_state = asp.transition(state, action)
+            min_val = self.abc_min_value(asp, next_state, ptm, alpha, beta, depth + 1, cutoff_ply, eval_func, board, loc)[1]
+            if min_val > value:
+                value = min_val
+                best_action = action
+            if value >= beta: return best_action, value
             alpha = max(alpha, value)
         
-        return bestAction, value
+        return best_action, value
 
 
     def abc_min_value(self, asp, state, ptm, alpha, beta, depth, cutoff_ply, eval_func, board, loc):
@@ -68,19 +74,83 @@ class StudentBot:
             return None, eval_func(actions)
 
         value = float('inf')
-        bestAction = None
+        best_action = None
 
         for action in actions:
-            nextState = asp.transition(state, action)
-            maxVal = self.abc_max_value(asp, nextState, ptm, alpha, beta, depth + 1, cutoff_ply, eval_func, board, loc)[1]
-            if maxVal < value:
-                value = maxVal
-                bestAction = action
-            if value <= alpha: return bestAction, value
+            next_state = asp.transition(state, action)
+            max_val = self.abc_max_value(asp, next_state, ptm, alpha, beta, depth + 1, cutoff_ply, eval_func, board, loc)[1]
+            if max_val < value:
+                value = max_val
+                best_action = action
+            if value <= alpha: return best_action, value
             beta = min(beta, value)
 
-        return bestAction, value
-    
+        return best_action, value
+
+    def get_neighbors(self, board, curr_row, curr_col):
+        end_row = len(board)-2
+        end_col = len(board[0])-2
+        neighbors = []
+
+        if (curr_row+1 <= end_row):
+            neighbors.append((curr_row+1, curr_col))
+        if (curr_row > 1):
+            neighbors.append((curr_row-1, curr_col))
+        if (curr_col+1 <= end_col):
+            neighbors.append((curr_row, curr_col+1))
+        if (curr_col > 1):
+            neighbors.append((curr_row, curr_col-1))
+
+        return neighbors
+
+    def dijkstra(self, state, board, loc):
+        # Distances 2-D list for keeping track of min distance to any given location
+        distances = [[float('inf') for col in range(len(board[0]))] for row in range(len(board))]
+
+        # Visited 2-D list for keeping track of locations we have already visited
+        visited = [[False for col in range(len(board[0]))] for row in range(len(board))]
+
+        start_row = loc[0]
+        start_col = loc[1]
+
+        distances[start_row][start_col] = 0
+
+        # Get the immediate neighbors around the current location
+        neighbors = self.get_neighbors(board, loc[0], loc[1])   
+
+        queue = deque([])
+
+        for n in neighbors:
+            n_row = n[0]
+            n_col = n[1]
+            # If neighbor is a safe move, set its distance to 1 and add it to the queue
+            if board[n_row][n_col] not in self.unsafe_vals:
+               distances[n_row][n_col] = 1
+               queue.appendleft(n)
+        
+        while len(queue) != 0:
+            curr_loc = queue.pop()
+            # Get the new distance that would be able to reach neighboring locations in
+            new_distance = distances[curr_loc[0]][curr_loc[1]] + 1
+
+            for n in self.get_neighbors(board, curr_loc[0], curr_loc[1]):
+                n_row = n[0]
+                n_col = n[1]
+
+                # Once again check if neighbor is a safe move
+                if board[n_row][n_col] not in self.unsafe_vals:
+
+                    # If the new distance is shorter than current shortest distance, update
+                    if new_distance < distances[n_row][n_col]:
+                        distances[n_row][n_col] = new_distance
+
+                    # If we haven't visited this location yet, add it to the queue and mark it as visited
+                    if not visited[n_row][n_col]:
+                        queue.appendleft(n)
+                        visited[n_row][n_col] = True
+
+        return distances
+
     def eval_func(self, actions):
         # 4 is maximum number of safe actions that can be taken
         return len(actions)/(4)
