@@ -29,7 +29,7 @@ class StudentBot:
         ptm = start.ptm
         loc = locs[ptm]
 
-        cutoff_ply = 2
+        cutoff_ply = 1
 
         #print(self.calc_distances(start, board, loc))
         action = self.abc_max_value(asp, start, ptm, float('-inf'), float('inf'), 0, cutoff_ply, board, loc)[0]
@@ -51,7 +51,7 @@ class StudentBot:
 
         for action in actions:
             next_state = asp.transition(state, action)
-            min_val = self.abc_min_value(asp, next_state, ptm, alpha, beta, depth + 1, cutoff_ply, board, loc)[1]
+            min_val = self.abc_min_value(asp, next_state, ptm, alpha, beta, depth + 1, cutoff_ply, next_state.board, next_state.player_locs[ptm])[1]
             if min_val > value:
                 value = min_val
                 best_action = action
@@ -77,7 +77,7 @@ class StudentBot:
 
         for action in actions:
             next_state = asp.transition(state, action)
-            max_val = self.abc_max_value(asp, next_state, ptm, alpha, beta, depth + 1, cutoff_ply, board, loc)[1]
+            max_val = self.abc_max_value(asp, next_state, ptm, alpha, beta, depth + 1, cutoff_ply, next_state.board, next_state.player_locs[ptm])[1]
             if max_val < value:
                 value = max_val
                 best_action = action
@@ -150,7 +150,7 @@ class StudentBot:
                     if not visited[n_row][n_col]:
                         queue.appendleft(n)
                         visited[n_row][n_col] = True
-
+        # distances = [[d if d != 0 else float('inf') for d in row] for row in distances]
         return distances
 
     def eval_func_voronoi(self, asp, state, board, loc, ptm):
@@ -159,22 +159,38 @@ class StudentBot:
         player_distances = self.calc_distances(state, board, loc)
         # print(player_distances)
         opp_distances = self.calc_distances(state, board, opp_loc)
+        
         # print(opp_distances)
         player_voronoi_size = 0
         opp_voronoi_size = 0
+        total = 0
         for row in range(len(board)):
             for col in range(len(board[0])):
-                if player_distances[row][col]!=float('inf') and player_distances[row][col]!=0:
-                    if player_distances[row][col] < opp_distances[row][col]:
-                        player_voronoi_size+=1
-                    if player_distances[row][col] > opp_distances[row][col]:
+                if player_distances[row][col]!=0 and opp_distances[row][col]!=0:
+                    if player_distances[row][col]==float('inf') and opp_distances[row][col]!=float('inf'):
                         opp_voronoi_size+=1
+                        total+=1
+                    elif player_distances[row][col]!=float('inf') and opp_distances[row][col]==float('inf'):
+                        player_voronoi_size+=1
+                        total+=1
+                    elif player_distances[row][col]!=float('inf') and opp_distances[row][col]!=float('inf'):
+                        if player_distances[row][col] < opp_distances[row][col]:
+                            player_voronoi_size+=1
+                            total+=1
+                        if player_distances[row][col] > opp_distances[row][col]:
+                            opp_voronoi_size+=1
+                            total+=1
+                    else:
+                        continue
         # print(player_voronoi_size)
         # print(opp_voronoi_size)
         # Scaled difference between Voronoi region size
-        total = (len(board)-2) * (len(board[0])-2)
-        voronoi = ((player_voronoi_size/total) - (opp_voronoi_size/total) + 1.0) / 2.0
-        print(voronoi)
+        # total = (len(board)-2) * (len(board[0])-2)
+        # voronoi = (player_voronoi_size - opp_voronoi_size) / float(total)
+        # voronoi = player_voronoi_size - opp_voronoi_size
+        voronoi = (((player_voronoi_size/total) - (opp_voronoi_size/total)) + 1.0) / 2.0
+        # voronoi = (((opp_voronoi_size/total) - (player_voronoi_size/total)) + 1.0) / 2.0
+        print('hhead')
         return voronoi
 
 
