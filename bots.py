@@ -31,7 +31,6 @@ class StudentBot:
 
         cutoff_ply = 1
 
-        #print(self.calc_distances(start, board, loc))
         action = self.abc_max_value(asp, start, ptm, float('-inf'), float('inf'), 0, cutoff_ply, board, loc)[0]
         return action
 
@@ -41,14 +40,13 @@ class StudentBot:
         if asp.is_terminal_state(state):
             return None, asp.evaluate_state(state)[ptm]
 
-        actions = list(TronProblem.get_safe_actions(board, loc))
-
         if depth >= cutoff_ply:
             return None, self.eval_func_voronoi(asp, state, board, loc, ptm)
 
         value = float('-inf')
         best_action = None
 
+        actions = list(TronProblem.get_safe_actions(board, loc))
         for action in actions:
             next_state = asp.transition(state, action)
             min_val = self.abc_min_value(asp, next_state, ptm, alpha, beta, depth + 1, cutoff_ply, next_state.board, next_state.player_locs[ptm])[1]
@@ -67,14 +65,13 @@ class StudentBot:
         if asp.is_terminal_state(state):
             return None, asp.evaluate_state(state)[ptm]
 
-        actions = list(TronProblem.get_safe_actions(board, loc))
-
         if depth >= cutoff_ply:
             return None, self.eval_func_voronoi(asp, state, board, loc, ptm)
 
         value = float('inf')
         best_action = None
 
+        actions = list(TronProblem.get_safe_actions(board, loc))
         for action in actions:
             next_state = asp.transition(state, action)
             max_val = self.abc_max_value(asp, next_state, ptm, alpha, beta, depth + 1, cutoff_ply, next_state.board, next_state.player_locs[ptm])[1]
@@ -150,17 +147,66 @@ class StudentBot:
                     if not visited[n_row][n_col]:
                         queue.appendleft(n)
                         visited[n_row][n_col] = True
-        # distances = [[d if d != 0 else float('inf') for d in row] for row in distances]
+
         return distances
+
+    def find_connected_component(self, board, component, curr_loc, visited):
+        unsafe_vals = {CellType.WALL, CellType.BARRIER}
+        # Mark current location as visited
+        visited[curr_loc[0]][curr_loc[1]] = True
+        # Add current location to component
+        component.append(board[curr_loc[0]][curr_loc[1]])
+        # Check all neighbors of current location 
+        for n in self.get_neighbors(board, curr_loc[0], curr_loc[1]):
+            n_row = n[0]
+            n_col = n[1]
+            # If neighbor hasn't been visited, recurse on the neighbor and check its neighbors
+            if board[n_row][n_col] not in unsafe_vals and not visited[n_row][n_col]:
+                component = self.find_connected_component(board, component, n, visited)
+        return component
+
+    def endgame_detection(self, board):
+        unsafe_vals = {CellType.WALL, CellType.BARRIER}
+        # Visited 2-D list for keeping track of locations we have already visited
+        visited = [[False for col in range(len(board[0]))] for row in range(len(board))]
+
+        # Loop through board and check connected components
+        for row in range(len(board)):
+            for col in range(len(board[0])):
+                # Only check a location if it's a valid location and hasn't been visited
+                if board[row][col] not in unsafe_vals and not visited[row][col]:
+                    curr_component = []
+                    curr_loc = (row, col)
+                    # Gets the entire component that the current location is in
+                    curr_component = (self.find_connected_component(board, curr_component, curr_loc, visited))
+                    # If player and opponent are in same component, not in endgame
+                    if '1' in curr_component and '2' in curr_component:
+                        return False
+                    # If player in component but opponent isn't, in endgame
+                    elif '1' in curr_component and '2' not in curr_component:
+                        return True
+                    # If player isn't in component, but opponent is, in endgame
+                    elif '1' not in curr_component and '2' in curr_component:
+                        return True
+                    # If neither player or opponent are in component, check next one
+                    else: 
+                        continue
+        return False
+
+    def eval_func_endgame(self, board, loc):
+        if len(TronProblem.get_safe_actions(board, loc)) < 3: return 0.5
+        else: return 0.3
 
     def eval_func_voronoi(self, asp, state, board, loc, ptm):
         opp_index = abs(ptm - 1)
         opp_loc = asp._player_locs_from_board(board)[opp_index]
         player_distances = self.calc_distances(state, board, loc)
-        # print(player_distances)
         opp_distances = self.calc_distances(state, board, opp_loc)
         
-        # print(opp_distances)
+        # Check if we are in the endgame, if we are, switch to wall-following
+        if self.endgame_detection(board):
+            return self.eval_func_endgame(board, loc)
+
         player_voronoi_size = 0
         opp_voronoi_size = 0
         total = 0
@@ -185,12 +231,11 @@ class StudentBot:
         # print(player_voronoi_size)
         # print(opp_voronoi_size)
         # Scaled difference between Voronoi region size
-        # total = (len(board)-2) * (len(board[0])-2)
-        # voronoi = (player_voronoi_size - opp_voronoi_size) / float(total)
-        # voronoi = player_voronoi_size - opp_voronoi_size
+        #voronoi_diff = (player_voronoi_size/total) - (opp_voronoi_size/total)
         voronoi = (((player_voronoi_size/total) - (opp_voronoi_size/total)) + 1.0) / 2.0
         # voronoi = (((opp_voronoi_size/total) - (player_voronoi_size/total)) + 1.0) / 2.0
-        print('hhead')
+        #print('hhead')
+        print(voronoi)
         return voronoi
 
 
