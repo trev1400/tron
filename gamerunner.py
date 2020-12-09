@@ -38,14 +38,14 @@ They will go UP this round."""
                     % (state.ptm + 1)
                 )
             decision = "U"
-        except: # pylint: disable=bare-except
-            if visualizer:
-                print(
-                    """Warning. The move for player %s encountered an unexpected error.
-They will go UP this round."""
-                    % (state.ptm + 1)
-                )
-            decision = "U"
+#         except: # pylint: disable=bare-except
+#             if visualizer:
+#                 print(
+#                     """Warning. The move for player %s encountered an unexpected error.
+# They will go UP this round."""
+#                     % (state.ptm + 1)
+#                 )
+#             decision = "U"
 
         signal.setitimer(signal.ITIMER_REAL, 0)
 

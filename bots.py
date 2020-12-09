@@ -17,7 +17,8 @@ class StudentBot:
         order = ["U", "D", "L", "R"]
         random.shuffle(order)
         self.order = order
-        self.cutoff_ply = 4
+        self.is_endgame = False
+        self.cutoff_ply = 7
 
     def decide(self, asp):
         """
@@ -32,12 +33,15 @@ class StudentBot:
         board = start.board
         ptm = start.ptm
         loc = locs[ptm]
-
-        action = self.abc_max_value(asp, start, ptm, float('-inf'), float('inf'), 0, self.cutoff_ply, board, loc)[0]
+        if not self.is_endgame:
+            if self.endgame_detection(board):
+                self.is_endgame = True
+                self.cutoff_ply = 14
+        action = self.abc_max_value(asp, start, ptm, float('-inf'), float('inf'), 0, self.cutoff_ply, board, loc, self.is_endgame)[0]
 
         return action
 
-    def abc_max_value(self, asp, state, ptm, alpha, beta, depth, cutoff_ply, board, loc):
+    def abc_max_value(self, asp, state, ptm, alpha, beta, depth, cutoff_ply, board, loc, is_endgame):
 
         # Check if a state is a terminal state before checking if it is at cutoff ply
         if asp.is_terminal_state(state):
@@ -46,6 +50,8 @@ class StudentBot:
             return None, asp.evaluate_state(state)[ptm]
 
         if depth >= cutoff_ply:
+            if is_endgame:
+                return None, self.eval_func_endgame(board, loc)
             return None, self.eval_func_voronoi(asp, board, loc, ptm)
 
         value = float('-inf')
@@ -60,7 +66,7 @@ class StudentBot:
             next_state = asp.transition(state, action)
             #print(next_state.ptm)
             #print(next_state.board)
-            min_val = self.abc_min_value(asp, next_state, next_state.ptm, alpha, beta, depth + 1, cutoff_ply, next_state.board, next_state.player_locs[next_state.ptm])[1]
+            min_val = self.abc_min_value(asp, next_state, next_state.ptm, alpha, beta, depth + 1, cutoff_ply, next_state.board, next_state.player_locs[next_state.ptm], is_endgame)[1]
             if min_val > value:
                 value = min_val
                 best_action = action
@@ -70,7 +76,7 @@ class StudentBot:
         return best_action, value
 
 
-    def abc_min_value(self, asp, state, ptm, alpha, beta, depth, cutoff_ply, board, loc):
+    def abc_min_value(self, asp, state, ptm, alpha, beta, depth, cutoff_ply, board, loc, is_endgame):
 
         # Check if a state is a terminal state before checking if it is at cutoff ply
         if asp.is_terminal_state(state):
@@ -80,6 +86,8 @@ class StudentBot:
             opp_ptm = abs(ptm-1)
             opp_loc = state.player_locs[opp_ptm]
             # We always want to calculate the voronoi from the perspective of the player (who is maximizing)
+            if is_endgame:
+                return None, self.eval_func_endgame(board, opp_loc)
             return None, self.eval_func_voronoi(asp, board, opp_loc, opp_ptm)
 
         value = float('inf')
@@ -95,7 +103,7 @@ class StudentBot:
             next_state = asp.transition(state, action)
             #print(next_state.ptm)
             #print(next_state.board)
-            max_val = self.abc_max_value(asp, next_state, next_state.ptm, alpha, beta, depth + 1, cutoff_ply, next_state.board, next_state.player_locs[next_state.ptm])[1]
+            max_val = self.abc_max_value(asp, next_state, next_state.ptm, alpha, beta, depth + 1, cutoff_ply, next_state.board, next_state.player_locs[next_state.ptm], is_endgame)[1]
             if max_val < value:
                 value = max_val
                 best_action = action
@@ -214,6 +222,16 @@ class StudentBot:
                         continue
         return False
 
+    def eval_func_endgame(self, board, curr_loc):
+        component = []
+        visited = [[False for col in range(len(board[0]))] for row in range(len(board))]
+        component = self.find_connected_component(board, component, curr_loc, visited)
+        # print(component)
+        return len(component)-1
+
+
+
+
     def eval_func_voronoi(self, asp, board, loc, ptm):
         opp_index = abs(ptm - 1)
         opp_loc = asp._player_locs_from_board(board)[opp_index]
@@ -223,6 +241,9 @@ class StudentBot:
         player_voronoi_size = 0
         opp_voronoi_size = 0
         total = 0
+        # if self.endgame_detection(board):
+        #     return self.eval_func_endgame(board, loc)
+
         for row in range(len(board)):
             for col in range(len(board[0])):
                 if player_distances[row][col]!=0 and opp_distances[row][col]!=0:
