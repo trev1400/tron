@@ -14,6 +14,10 @@ class StudentBot:
 
     def __init__(self):
         self.unsafe_vals = {CellType.WALL, CellType.BARRIER, '1', '2'}
+        order = ["U", "D", "L", "R"]
+        random.shuffle(order)
+        self.order = order
+        self.cutoff_ply = 4
 
     def decide(self, asp):
         """
@@ -29,33 +33,40 @@ class StudentBot:
         ptm = start.ptm
         loc = locs[ptm]
 
-        cutoff_ply = 1
+        action = self.abc_max_value(asp, start, ptm, float('-inf'), float('inf'), 0, self.cutoff_ply, board, loc)[0]
 
-        action = self.abc_max_value(asp, start, ptm, float('-inf'), float('inf'), 0, cutoff_ply, board, loc)[0]
         return action
 
     def abc_max_value(self, asp, state, ptm, alpha, beta, depth, cutoff_ply, board, loc):
 
         # Check if a state is a terminal state before checking if it is at cutoff ply
         if asp.is_terminal_state(state):
+            #print(state.board)
+            #print("terminal state: ", asp.evaluate_state(state))
             return None, asp.evaluate_state(state)[ptm]
 
         if depth >= cutoff_ply:
-            return None, self.eval_func_voronoi(asp, state, board, loc, ptm)
+            return None, self.eval_func_voronoi(asp, board, loc, ptm)
 
         value = float('-inf')
         best_action = None
 
-        actions = list(TronProblem.get_safe_actions(board, loc))
+        actions = list(asp.get_safe_actions(board, loc))
+        #print("max actions: ", actions)
+        if not actions:
+            return None, float('-inf')
         for action in actions:
+            #print(state.ptm)
             next_state = asp.transition(state, action)
-            min_val = self.abc_min_value(asp, next_state, ptm, alpha, beta, depth + 1, cutoff_ply, next_state.board, next_state.player_locs[ptm])[1]
+            #print(next_state.ptm)
+            #print(next_state.board)
+            min_val = self.abc_min_value(asp, next_state, next_state.ptm, alpha, beta, depth + 1, cutoff_ply, next_state.board, next_state.player_locs[next_state.ptm])[1]
             if min_val > value:
                 value = min_val
                 best_action = action
-            if value >= beta: return best_action, value
+            if value >= beta: 
+                return best_action, value
             alpha = max(alpha, value)
-
         return best_action, value
 
 
@@ -66,21 +77,31 @@ class StudentBot:
             return None, asp.evaluate_state(state)[ptm]
 
         if depth >= cutoff_ply:
-            return None, self.eval_func_voronoi(asp, state, board, loc, ptm)
+            opp_ptm = abs(ptm-1)
+            opp_loc = state.player_locs[opp_ptm]
+            # We always want to calculate the voronoi from the perspective of the player (who is maximizing)
+            return None, self.eval_func_voronoi(asp, board, opp_loc, opp_ptm)
 
         value = float('inf')
         best_action = None
 
-        actions = list(TronProblem.get_safe_actions(board, loc))
+        actions = list(asp.get_safe_actions(board, loc))
+        #print("min actions: ", actions)
+        if not actions:
+            return None, float('inf')
         for action in actions:
+            #print("action explored")
+            #print(state.ptm)
             next_state = asp.transition(state, action)
-            max_val = self.abc_max_value(asp, next_state, ptm, alpha, beta, depth + 1, cutoff_ply, next_state.board, next_state.player_locs[ptm])[1]
+            #print(next_state.ptm)
+            #print(next_state.board)
+            max_val = self.abc_max_value(asp, next_state, next_state.ptm, alpha, beta, depth + 1, cutoff_ply, next_state.board, next_state.player_locs[next_state.ptm])[1]
             if max_val < value:
                 value = max_val
                 best_action = action
-            if value <= alpha: return best_action, value
+            if value <= alpha: 
+                return best_action, value
             beta = min(beta, value)
-
         return best_action, value
 
     def get_neighbors(self, board, curr_row, curr_col):
@@ -100,7 +121,7 @@ class StudentBot:
 
         return neighbors
 
-    def calc_distances(self, state, board, loc):
+    def calc_distances(self, board, loc):
         # Distances 2-D list for keeping track of min distance to any given location
         distances = [[float('inf') for col in range(len(board[0]))] for row in range(len(board))]
 
@@ -193,19 +214,11 @@ class StudentBot:
                         continue
         return False
 
-    def eval_func_endgame(self, board, loc):
-        if len(TronProblem.get_safe_actions(board, loc)) < 3: return 0.5
-        else: return 0.3
-
-    def eval_func_voronoi(self, asp, state, board, loc, ptm):
+    def eval_func_voronoi(self, asp, board, loc, ptm):
         opp_index = abs(ptm - 1)
         opp_loc = asp._player_locs_from_board(board)[opp_index]
-        player_distances = self.calc_distances(state, board, loc)
-        opp_distances = self.calc_distances(state, board, opp_loc)
-        
-        # Check if we are in the endgame, if we are, switch to wall-following
-        if self.endgame_detection(board):
-            return self.eval_func_endgame(board, loc)
+        player_distances = self.calc_distances(board, loc)
+        opp_distances = self.calc_distances(board, opp_loc)
 
         player_voronoi_size = 0
         opp_voronoi_size = 0
@@ -228,21 +241,10 @@ class StudentBot:
                             total+=1
                     else:
                         continue
-        # print(player_voronoi_size)
-        # print(opp_voronoi_size)
-        # Scaled difference between Voronoi region size
-        #voronoi_diff = (player_voronoi_size/total) - (opp_voronoi_size/total)
-        voronoi = (((player_voronoi_size/total) - (opp_voronoi_size/total)) + 1.0) / 2.0
-        # voronoi = (((opp_voronoi_size/total) - (player_voronoi_size/total)) + 1.0) / 2.0
-        #print('hhead')
-        print(voronoi)
+        voronoi = (player_voronoi_size - opp_voronoi_size)
+        #voronoi = (((player_voronoi_size/total) - (opp_voronoi_size/total)) + 1.0) / 2.0
+        #print("voronoi val: ", voronoi)
         return voronoi
-
-
-
-    def eval_func(self, actions):
-        # 4 is maximum number of safe actions that can be taken
-        return len(actions)/(4)
 
     def cleanup(self):
         """
