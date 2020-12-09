@@ -14,11 +14,7 @@ class StudentBot:
 
     def __init__(self):
         self.unsafe_vals = {CellType.WALL, CellType.BARRIER, '1', '2'}
-        order = ["U", "D", "L", "R"]
-        random.shuffle(order)
-        self.order = order
-        self.is_endgame = False
-        self.cutoff_ply = 7
+        # self.cutoff_ply = 7
 
     def decide(self, asp):
         """
@@ -33,11 +29,12 @@ class StudentBot:
         board = start.board
         ptm = start.ptm
         loc = locs[ptm]
-        if not self.is_endgame:
-            if self.endgame_detection(board):
-                self.is_endgame = True
-                self.cutoff_ply = 14
-        action = self.abc_max_value(asp, start, ptm, float('-inf'), float('inf'), 0, self.cutoff_ply, board, loc, self.is_endgame)[0]
+        cutoff_ply = 7
+        is_endgame = False
+        if self.endgame_detection(board):
+            is_endgame = True
+            cutoff_ply = 13
+        action = self.abc_max_value(asp, start, ptm, float('-inf'), float('inf'), 0, cutoff_ply, board, loc, is_endgame)[0]
 
         return action
 
