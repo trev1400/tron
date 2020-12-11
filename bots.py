@@ -42,8 +42,6 @@ class StudentBot:
 
         # Check if a state is a terminal state before checking if it is at cutoff ply
         if asp.is_terminal_state(state):
-            #print(state.board)
-            #print("terminal state: ", asp.evaluate_state(state))
             return None, asp.evaluate_state(state)[ptm]
 
         if depth >= cutoff_ply:
@@ -55,14 +53,10 @@ class StudentBot:
         best_action = None
 
         actions = list(asp.get_safe_actions(board, loc))
-        #print("max actions: ", actions)
         if not actions:
             return None, float('-inf')
         for action in actions:
-            #print(state.ptm)
             next_state = asp.transition(state, action)
-            #print(next_state.ptm)
-            #print(next_state.board)
             min_val = self.abc_min_value(asp, next_state, next_state.ptm, alpha, beta, depth + 1, cutoff_ply, next_state.board, next_state.player_locs[next_state.ptm], is_endgame)[1]
             if min_val > value:
                 value = min_val
@@ -91,15 +85,10 @@ class StudentBot:
         best_action = None
 
         actions = list(asp.get_safe_actions(board, loc))
-        #print("min actions: ", actions)
         if not actions:
             return None, float('inf')
         for action in actions:
-            #print("action explored")
-            #print(state.ptm)
             next_state = asp.transition(state, action)
-            #print(next_state.ptm)
-            #print(next_state.board)
             max_val = self.abc_max_value(asp, next_state, next_state.ptm, alpha, beta, depth + 1, cutoff_ply, next_state.board, next_state.player_locs[next_state.ptm], is_endgame)[1]
             if max_val < value:
                 value = max_val
@@ -223,7 +212,6 @@ class StudentBot:
         component = []
         visited = [[False for col in range(len(board[0]))] for row in range(len(board))]
         component = self.find_connected_component(board, component, curr_loc, visited)
-        # print(component)
         return len(component)-1
 
 
@@ -260,8 +248,6 @@ class StudentBot:
                     else:
                         continue
         voronoi = (player_voronoi_size - opp_voronoi_size)
-        #voronoi = (((player_voronoi_size/total) - (opp_voronoi_size/total)) + 1.0) / 2.0
-        #print("voronoi val: ", voronoi)
         return voronoi
 
     def cleanup(self):
